@@ -62,6 +62,7 @@ import {
   Maximize,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowRight,
 } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaTwitter, FaYoutube } from "react-icons/fa";
 import { useRouter } from "next/navigation";
@@ -305,12 +306,14 @@ const footerLinks = {
   },
 };
 
+type Booking = (typeof bookingsData)[number];
+
 export default function BookingsManagementPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
-  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -359,7 +362,7 @@ export default function BookingsManagementPage() {
         text: "text-blue-700",
       },
     };
-    return statusMap[status] || statusMap.pending;
+    return statusMap[status as keyof typeof statusMap] || statusMap.pending;
   };
 
   // Obtenir le statut de paiement
@@ -384,11 +387,11 @@ export default function BookingsManagementPage() {
         text: "text-purple-700",
       },
     };
-    return paymentMap[payment] || paymentMap.pending;
+    return paymentMap[payment as keyof typeof paymentMap] || paymentMap.pending;
   };
 
   // Ouvrir le détail d'une réservation
-  const handleViewDetails = (booking) => {
+  const handleViewDetails = (booking: Booking) => {
     setSelectedBooking(booking);
     setShowDetailModal(true);
   };
@@ -406,7 +409,7 @@ export default function BookingsManagementPage() {
   };
 
   // Contacter le client
-  const handleContact = (booking) => {
+  const handleContact = (booking: Booking) => {
     console.log("Contacter le client", booking);
     // Logique de contact
   };
