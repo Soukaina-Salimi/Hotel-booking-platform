@@ -1,0 +1,23 @@
+# services/booking-service/Dockerfile.render
+FROM php:8.3-cli-alpine
+
+RUN apk add --no-cache \
+        git \
+        curl \
+        libzip-dev \
+        oniguruma-dev \
+        rabbitmq-c-dev \
+        $PHPIZE_DEPS \
+    && docker-php-ext-install pdo pdo_mysql mbstring zip bcmath \
+    && pecl install amqp \
+    && docker-php-ext-enable amqp
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+WORKDIR /var/www/html
+COPY . .
+RUN composer install --no-interaction --no-dev --prefer-dist --optimize-autoloader
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+RUN mkdir -p /var/www/html/ssl
+EXPOSE 8000
+CMD ["sh", "-c", "php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
