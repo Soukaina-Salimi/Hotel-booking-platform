@@ -718,7 +718,7 @@ export default function PartnerDashboardPage() {
                         </span>
                         <span className="flex items-center gap-1">
                           <MessageCircle size={10} />
-                          {callback.messages.length} messages
+                          {callback.messages?.length ?? 0} messages
                         </span>
                       </div>
                     </div>
@@ -1887,7 +1887,7 @@ export default function PartnerDashboardPage() {
                 />
               </div>
 
-              {selectedCallback.messages.map((msg, index) => (
+              {(selectedCallback.messages ?? []).map((msg, index) => (
                 <div
                   key={index}
                   className={`flex ${msg.role === "user" ? "justify-start" : "justify-end"}`}

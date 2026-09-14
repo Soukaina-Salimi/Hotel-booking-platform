@@ -1,7 +1,7 @@
 // app/partner/dashboard/bookings/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -1138,7 +1138,7 @@ export default function BookingsManagementPage() {
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
 
-  useState(() => {
+  useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
