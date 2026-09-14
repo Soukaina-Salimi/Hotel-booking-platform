@@ -1,0 +1,169 @@
+version: "3.9"
+
+# ---------------------------------------------------------------------------
+# Reservation Hoteliere - orchestration locale de developpement
+# Lance tout avec :  docker compose up -d --build
+# phpMyAdmin (equivalent de l'outil XAMPP) : http://localhost:8080
+# Nginx (point d'entree API)               : http://localhost:8000
+# RabbitMQ management UI                   : http://localhost:15672  (guest/guest)
+# ---------------------------------------------------------------------------
+
+services:
+  # --------------------------- Reverse proxy / routing ---------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: rh_nginx
+    ports:
+      - "8000:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - auth-service
+      - hotel-service
+      - booking-service
+      - chat-service
+    networks:
+      - rh_network
+
+  # --------------------------- Base de donnees MySQL ------------------------------
+  # Un seul serveur MySQL en dev, avec une base par service (voir mysql/init).
+  # En production, chaque service peut pointer vers une instance MySQL managee separee.
+  mysql:
+    image: mysql:8.0
+    container_name: rh_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: auth_db
+    ports:
+      - "3307:3306" # 3307 cote hote pour ne pas entrer en conflit avec un MySQL local (XAMPP) sur 3306
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-proot_password",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - rh_network
+
+  # --------------------------- Interface d'administration BD ---------------------
+  # Remplace phpMyAdmin de XAMPP, pointe vers le MySQL du conteneur ci-dessus.
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: rh_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: root_password
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - rh_network
+
+  # --------------------------- Broker de messages (evenements async) -------------
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rh_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - rh_network
+
+  # --------------------------- Microservices Laravel ------------------------------
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: docker/Dockerfile
+    container_name: rh_auth_service
+    volumes:
+      - ./services/auth-service:/var/www/html
+    environment:
+      - DB_HOST=mysql
+      - DB_DATABASE=auth_db
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - rh_network
+
+  hotel-service:
+    build:
+      context: ./services/hotel-service
+      dockerfile: docker/Dockerfile
+    container_name: rh_hotel_service
+    volumes:
+      - ./services/hotel-service:/var/www/html
+    environment:
+      - DB_HOST=mysql
+      - DB_DATABASE=hotel_db
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - rh_network
+
+  booking-service:
+    build:
+      context: ./services/booking-service
+      dockerfile: docker/Dockerfile
+    container_name: rh_booking_service
+    volumes:
+      - ./services/booking-service:/var/www/html
+    environment:
+      - DB_HOST=mysql
+      - DB_DATABASE=booking_db
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    networks:
+      - rh_network
+
+  chat-service:
+    build:
+      context: ./services/chat-service
+      dockerfile: docker/Dockerfile
+    container_name: rh_chat_service
+    volumes:
+      - ./services/chat-service:/var/www/html
+    environment:
+      - DB_HOST=mysql
+      - DB_DATABASE=chat_db
+      - HOTEL_SERVICE_URL=http://hotel-service:8000
+      - BOOKING_SERVICE_URL=http://booking-service:8000
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+      hotel-service:
+        condition: service_started
+      booking-service:
+        condition: service_started
+    networks:
+      - rh_network
+networks:
+  rh_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
