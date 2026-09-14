@@ -1,7 +1,7 @@
 // app/partner/dashboard/calendar/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -247,7 +247,8 @@ export default function CalendarManagementPage() {
 
   // Vérifier si un jour est disponible pour une chambre
   const isDayAvailable = (roomId: number, day: number) => {
-    const roomData = availabilityData[roomId as keyof typeof availabilityData];
+    const roomData =
+      availabilityData[String(roomId) as keyof typeof availabilityData];
     if (!roomData) return false;
     return roomData.available.includes(day);
   };
@@ -281,7 +282,8 @@ export default function CalendarManagementPage() {
 
   // Obtenir le nombre de jours disponibles pour une chambre
   const getAvailableDaysCount = (roomId: number) => {
-    const roomData = availabilityData[roomId as keyof typeof availabilityData];
+    const roomData =
+      availabilityData[String(roomId) as keyof typeof availabilityData];
     if (!roomData) return 0;
     return roomData.available.length;
   };
@@ -832,7 +834,7 @@ export default function CalendarManagementPage() {
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
 
-  useState(() => {
+  useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);

@@ -1,7 +1,7 @@
 // app/partner/dashboard/reviews/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -278,12 +278,14 @@ const footerLinks = {
   },
 };
 
+type Review = (typeof reviewsData)[number];
+
 export default function ReviewsManagementPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [ratingFilter, setRatingFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedReview, setSelectedReview] = useState(null);
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -333,7 +335,7 @@ export default function ReviewsManagementPage() {
   };
 
   // Ouvrir le détail d'un avis
-  const handleViewDetails = (review) => {
+  const handleViewDetails = (review: Review) => {
     setSelectedReview(review);
     setReplyText(review.reply || "");
     setShowDetailModal(true);
@@ -910,7 +912,7 @@ export default function ReviewsManagementPage() {
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
 
-  useState(() => {
+  useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);

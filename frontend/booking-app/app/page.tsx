@@ -111,11 +111,19 @@ const trustPoints = [
   },
 ];
 
-function ArchFrame({ className = "", children }) {
+function ArchFrame({
+  className = "",
+  children,
+  style,
+}: {
+  className?: string;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
   return (
     <div
       className={`overflow-hidden ${className}`}
-      style={{ borderRadius: "999px 999px 12px 12px" }}
+      style={{ borderRadius: "999px 999px 12px 12px", ...style }}
     >
       {children}
     </div>
