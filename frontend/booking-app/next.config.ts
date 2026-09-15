@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.up.railway.app" },
       { protocol: "https", hostname: "**.vercel.app" },
       { protocol: "https", hostname: "images.unsplash.com" }, // ← AJOUTER
+      { protocol: "https", hostname: "images.pexels.com" },
 
     ],
     dangerouslyAllowLocalIP: true,
