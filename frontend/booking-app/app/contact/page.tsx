@@ -186,18 +186,15 @@ export default function ContactPage() {
     const userId = cachedUser ? JSON.parse(cachedUser).id : null;
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/chat/message`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conversation_id: conversationId,
-            message: text,
-            user_id: userId, // pas de hotel_id : mode plateforme
-          }),
-        },
-      );
+      const res = await fetch(`/api/chat/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          message: text,
+          user_id: userId, // pas de hotel_id : mode plateforme
+        }),
+      });
       const json = await res.json();
       setConversationId(json.conversation_id);
       setMessages((prev) => [

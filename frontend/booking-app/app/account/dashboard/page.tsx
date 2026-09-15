@@ -227,7 +227,7 @@ export default function ClientDashboardPage() {
 
     if (cachedUser) setAuthUser(JSON.parse(cachedUser));
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+    fetch(`/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -244,7 +244,7 @@ export default function ClientDashboardPage() {
 
   function handleLogout() {
     const token = localStorage.getItem("auth_token");
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
+    fetch(`/api/auth/logout`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
     }).finally(() => {

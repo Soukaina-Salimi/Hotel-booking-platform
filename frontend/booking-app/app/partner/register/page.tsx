@@ -235,20 +235,17 @@ export default function PartnerRegisterPage() {
     setError("");
 
     try {
-      const authRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/register`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: `${formData.firstName} ${formData.lastName}`,
-            email: formData.email,
-            password: formData.password,
-            phone: formData.phone,
-            role: "hotel",
-          }),
-        },
-      );
+      const authRes = await fetch(`/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone,
+          role: "hotel",
+        }),
+      });
 
       if (!authRes.ok) {
         const json = await authRes.json().catch(() => null);
@@ -260,21 +257,18 @@ export default function PartnerRegisterPage() {
 
       const { token, user } = await authRes.json();
 
-      const hotelRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/hotels`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            owner_id: user.id,
-            name: formData.hotelName,
-            city: formData.city,
-            address: formData.address,
-            description: formData.hotelDescription,
-            amenities: formData.amenities,
-          }),
-        },
-      );
+      const hotelRes = await fetch(`/api/hotels`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          owner_id: user.id,
+          name: formData.hotelName,
+          city: formData.city,
+          address: formData.address,
+          description: formData.hotelDescription,
+          amenities: formData.amenities,
+        }),
+      });
 
       if (!hotelRes.ok) {
         throw new Error(

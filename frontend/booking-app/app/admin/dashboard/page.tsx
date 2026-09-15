@@ -72,7 +72,7 @@ export default function AdminDashboardPage() {
     }
     if (cachedUser) setAuthUser(JSON.parse(cachedUser));
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+    fetch(`/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -96,7 +96,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (authUser?.role !== "admin") return;
     setIsLoading(true);
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/admin-todos`)
+    fetch(`/api/chat/admin-todos`)
       .then((res) => res.json())
       .then((json) => setTodos(json.data ?? []))
       .catch((err) => console.error(err))
@@ -104,7 +104,7 @@ export default function AdminDashboardPage() {
   }, [authUser]);
 
   async function markHandled(id: string) {
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/todos/${id}/handled`, {
+    await fetch(`/api/chat/todos/${id}/handled`, {
       method: "POST",
     });
     setTodos((prev) => prev.filter((t) => t.id !== id));

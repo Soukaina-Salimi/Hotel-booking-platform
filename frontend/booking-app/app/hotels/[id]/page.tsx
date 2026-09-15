@@ -156,9 +156,7 @@ export default function HotelDetailPage() {
         setError(null);
 
         // Récupérer les détails de l'hôtel
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/hotels/${hotelId}`,
-        );
+        const response = await fetch(`/api/hotels/${hotelId}`);
 
         if (!response.ok) {
           throw new Error("Hôtel non trouvé");

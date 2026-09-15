@@ -84,7 +84,7 @@ export default function BookingPage() {
   // --- Fetch hôtel + chambres ---
   useEffect(() => {
     setIsInitialLoading(true);
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/hotels/${hotelId}`)
+    fetch(`/api/hotels/${hotelId}`)
       .then((res) => res.json())
       .then((json) => {
         setHotelName(json.data?.name ?? "");
@@ -202,7 +202,7 @@ export default function BookingPage() {
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings`, {
+      const res = await fetch(`/api/bookings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

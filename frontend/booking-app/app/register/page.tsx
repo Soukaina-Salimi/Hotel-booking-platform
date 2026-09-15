@@ -98,20 +98,17 @@ export default function RegisterPage() {
 
     setIsLoading(true);
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/register`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: `${formData.firstName} ${formData.lastName}`,
-            email: formData.email,
-            password: formData.password,
-            phone: formData.phone,
-            role: "client", // cette page ne cree plus que des comptes voyageur, voir logique de redirection ci-dessous
-          }),
-        },
-      );
+      const res = await fetch(`/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone,
+          role: "client", // cette page ne cree plus que des comptes voyageur, voir logique de redirection ci-dessous
+        }),
+      });
 
       if (!res.ok) {
         let message = "Impossible de créer le compte, réessayez.";
