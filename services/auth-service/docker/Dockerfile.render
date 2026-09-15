@@ -17,7 +17,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Copier tout le code source dans l'image
+# Copier tout le code source dans l'image (inclut ca.pem s'il est à la racine du service)
 COPY . .
 
 # Installer les dépendances PHP sans les dev
@@ -27,10 +27,10 @@ RUN composer install --no-interaction --no-dev --prefer-dist --optimize-autoload
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Créer le dossier pour le certificat SSL Aiven
-RUN mkdir -p /var/www/html/ssl
+# ✅ CORRECTION : Copier le certificat SSL Aiven dans le dossier ssl/
+RUN mkdir -p /var/www/html/ssl && cp /var/www/html/ca.pem /var/www/html/ssl/ca.pem
 
-# Port exposé (Render impose le sien via $PORT)
+# Port exposé
 EXPOSE 8000
 
 # Script de démarrage

@@ -1,23 +1,37 @@
-# services/booking-service/Dockerfile.render
+# Dockerfile de production pour Render
+# Ce Dockerfile copie tout le code dans l'image (pas de volume Docker)
+
 FROM php:8.3-cli-alpine
 
+# Extensions PHP nécessaires à Laravel + MySQL
 RUN apk add --no-cache \
         git \
         curl \
         libzip-dev \
         oniguruma-dev \
-        rabbitmq-c-dev \
         $PHPIZE_DEPS \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip bcmath \
-    && pecl install amqp \
-    && docker-php-ext-enable amqp
+    && docker-php-ext-install pdo pdo_mysql mbstring zip bcmath
 
+# Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
 WORKDIR /var/www/html
+
+# Copier tout le code source dans l'image (inclut ca.pem s'il est à la racine du service)
 COPY . .
+
+# Installer les dépendances PHP sans les dev
 RUN composer install --no-interaction --no-dev --prefer-dist --optimize-autoloader
+
+# Permissions Laravel
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
-RUN mkdir -p /var/www/html/ssl
+
+# ✅ CORRECTION : Copier le certificat SSL Aiven dans le dossier ssl/
+RUN mkdir -p /var/www/html/ssl && cp /var/www/html/ca.pem /var/www/html/ssl/ca.pem
+
+# Port exposé
 EXPOSE 8000
+
+# Script de démarrage
 CMD ["sh", "-c", "php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
