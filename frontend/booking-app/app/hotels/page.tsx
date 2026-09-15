@@ -117,7 +117,7 @@ export default function HotelsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/hotels`);
+        const res = await fetch(`/api/hotels`);
         if (!res.ok) throw new Error(`Erreur serveur (${res.status})`);
         const json = await res.json();
         setHotels(json.data ?? []);
