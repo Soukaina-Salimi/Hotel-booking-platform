@@ -270,7 +270,7 @@ export default function PartnerDashboardPage() {
 
     if (cachedUser) setAuthUser(JSON.parse(cachedUser));
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+    fetch(`/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -279,9 +279,7 @@ export default function PartnerDashboardPage() {
       })
       .then((data) => {
         setAuthUser(data.user);
-        return fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/hotels/mine?owner_id=${data.user.id}`,
-        );
+        return fetch(`/api/hotels/mine?owner_id=${data.user.id}`);
       })
       .then((res) => res.json())
       .then((json) => {
@@ -296,7 +294,7 @@ export default function PartnerDashboardPage() {
 
   useEffect(() => {
     if (!hotelId) return;
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/hotels/${hotelId}`)
+    fetch(`/api/hotels/${hotelId}`)
       .then((res) => res.json())
       .then((json) => {
         const h = json.data;
@@ -344,13 +342,10 @@ export default function PartnerDashboardPage() {
     if (coverFile) formData.append("cover_image", coverFile);
 
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/hotels/${hotelId}`,
-        {
-          method: "POST", // POST + _method=PUT, pas de vrai PUT (upload de fichier)
-          body: formData,
-        },
-      );
+      const res = await fetch(`/api/hotels/${hotelId}`, {
+        method: "POST", // POST + _method=PUT, pas de vrai PUT (upload de fichier)
+        body: formData,
+      });
       if (!res.ok) throw new Error("Échec de la mise à jour");
       const json = await res.json();
       setHotelData(json.data);
@@ -374,7 +369,7 @@ export default function PartnerDashboardPage() {
   useEffect(() => {
     if (!hotelId) return;
     setIsLoadingCallbacks(true);
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/todos?hotel_id=${hotelId}`)
+    fetch(`/api/chat/todos?hotel_id=${hotelId}`)
       .then((res) => res.json())
       .then((json) => {
         const data: Callback[] = (json.data ?? []).map((cb: any) => ({
@@ -391,13 +386,13 @@ export default function PartnerDashboardPage() {
   }, [hotelId]);
   useEffect(() => {
     if (!hotelId) return;
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/hotels/${hotelId}`)
+    fetch(`/api/hotels/${hotelId}`)
       .then((res) => res.json())
       .then((json) => setHotelName(json.data?.name ?? null))
       .catch((err) => console.error(err));
   }, [hotelId]);
   async function markAsHandled(id: string) {
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/todos/${id}/handled`, {
+    await fetch(`/api/chat/todos/${id}/handled`, {
       method: "POST",
     });
     setCallbacks((prev) =>

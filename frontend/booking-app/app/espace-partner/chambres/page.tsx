@@ -168,7 +168,7 @@ export default function RoomsManagementPage() {
       return;
     }
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+    fetch(`/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -177,9 +177,7 @@ export default function RoomsManagementPage() {
       })
       .then((data) => {
         setAuthUser(data.user);
-        return fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/hotels/mine?owner_id=${data.user.id}`,
-        );
+        return fetch(`/api/hotels/mine?owner_id=${data.user.id}`);
       })
       .then((res) => res.json())
       .then((json) => {
@@ -198,9 +196,7 @@ export default function RoomsManagementPage() {
   async function fetchRooms(id: string) {
     setIsLoadingRooms(true);
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/rooms?hotel_id=${id}`,
-      );
+      const res = await fetch(`/api/rooms?hotel_id=${id}`);
       const json = await res.json();
       setRooms(json.data ?? []);
     } catch (err) {
@@ -313,9 +309,7 @@ export default function RoomsManagementPage() {
     if (roomImageFile) formData.append("image", roomImageFile);
 
     try {
-      const url = editingRoom
-        ? `${process.env.NEXT_PUBLIC_API_URL}/rooms/${editingRoom.id}`
-        : `${process.env.NEXT_PUBLIC_API_URL}/rooms`;
+      const url = editingRoom ? `/api/rooms/${editingRoom.id}` : `/api/rooms`;
 
       const res = await fetch(url, { method: "POST", body: formData });
       if (!res.ok) throw new Error("Échec de l'enregistrement");
@@ -350,10 +344,9 @@ export default function RoomsManagementPage() {
       return;
 
     try {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/rooms/${room.id}?owner_id=${authUser.id}`,
-        { method: "DELETE" },
-      );
+      await fetch(`/api/rooms/${room.id}?owner_id=${authUser.id}`, {
+        method: "DELETE",
+      });
       setRooms((prev) => prev.filter((r) => r.id !== room.id));
     } catch (err) {
       console.error(err);
