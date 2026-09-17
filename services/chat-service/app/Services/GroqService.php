@@ -18,7 +18,7 @@ class GroqService
         $rooms = 'Non renseignees';
         if (!empty($hotel['rooms'])) {
             $rooms = collect($hotel['rooms'])
-                ->map(fn ($r) => "- id={$r['id']} : {$r['room_type']}, {$r['price']} MAD/nuit, capacite {$r['capacity']} personnes"
+                ->map(fn($r) => "- id={$r['id']} : {$r['room_type']}, {$r['price']} MAD/nuit, capacite {$r['capacity']} personnes"
                     . (!empty($r['description']) ? " ({$r['description']})" : ''))
                 ->implode("\n");
         }
@@ -102,8 +102,8 @@ FAQ;
             } else {
                 $bookingContext = "Reservations de l'utilisateur connecte (les seules que tu as le droit de mentionner) :\n"
                     . collect($userBookings)
-                        ->map(fn ($b) => "- Reservation du {$b['check_in']} au {$b['check_out']}, statut : {$b['status']}")
-                        ->implode("\n");
+                    ->map(fn($b) => "- Reservation du {$b['check_in']} au {$b['check_out']}, statut : {$b['status']}")
+                    ->implode("\n");
             }
         }
 
@@ -135,8 +135,15 @@ Comment repondre :
 2. Si la question porte sur une reservation/un paiement et que l'utilisateur n'est pas connecte ->
    demande-lui de se connecter, n'essaie jamais de deviner.
 3. Si la question sort de ce perimetre (litige, remboursement complexe, bug, plainte) -> explique
-   qu'un conseiller va prendre le relais, et demande un moyen de contact (email ou telephone).
+   qu'un conseiller va prendre le relais, et demande un moyen de contact : un EMAIL ou un NUMERO
+   DE TELEPHONE (au choix du client, un seul suffit).
 4. Reste concis (2-3 phrases maximum).
+
+Important - deux champs de contact distincts :
+Si le client donne un numero de telephone, mets-le UNIQUEMENT dans "lead_phone".
+Si le client donne un email, mets-le UNIQUEMENT dans "lead_email".
+Ne mets jamais un email dans "lead_phone" ni l'inverse. Un seul des deux suffit pour
+passer "ready_to_notify" a true.
 
 Liens cliquables (champ "link") :
 Quand ta reponse mentionne une action de navigation, ajoute le lien correspondant UNIQUEMENT
@@ -149,8 +156,9 @@ Tu dois TOUJOURS repondre UNIQUEMENT avec un objet JSON valide, au format exact 
 {
   "reply": "le texte a afficher a l'utilisateur",
   "lead_name": null,
-  "lead_phone": "email ou telephone si l'utilisateur vient de le donner dans son dernier message, sinon null",
-  "ready_to_notify": true ou false (true seulement si tu viens de recevoir un contact valide),
+  "lead_phone": "numero de telephone si l'utilisateur vient de le donner dans son dernier message, sinon null",
+  "lead_email": "email si l'utilisateur vient de le donner dans son dernier message, sinon null",
+  "ready_to_notify": true ou false (true seulement si tu viens de recevoir un email OU un telephone valide),
   "summary": "resume en une phrase de la demande, seulement si ready_to_notify est true, sinon null",
   "link": {"label": "...", "href": "..."} ou null
 }
@@ -188,6 +196,7 @@ PROMPT;
                 'reply' => "Toutes mes excuses, j'ai un souci technique. Un membre de l'equipe vous recontactera rapidement, pouvez-vous me laisser un email ou un numero ?",
                 'lead_name' => null,
                 'lead_phone' => null,
+                'lead_email' => null,
                 'ready_to_notify' => false,
                 'summary' => null,
                 'link' => null,
@@ -202,6 +211,7 @@ PROMPT;
             'reply' => 'Pouvez-vous reformuler votre demande ?',
             'lead_name' => null,
             'lead_phone' => null,
+            'lead_email' => null,
             'ready_to_notify' => false,
             'summary' => null,
             'link' => null,

@@ -127,11 +127,34 @@ class ChatController extends Controller
         if (!empty($result['lead_name'])) {
             $conversation->lead_name = $result['lead_name'];
         }
-        if (!empty($result['ready_to_notify']) && !empty($result['lead_phone'])) {
-            $conversation->lead_phone = $result['lead_phone'];
-            $conversation->summary = $result['summary'];
-            $conversation->status = 'notified';
+
+        if (!empty($result['ready_to_notify']) && (!empty($result['lead_phone']) || !empty($result['lead_email']))) {
+            $phoneValid = empty($result['lead_phone']) || $this->isValidPhoneNumber($result['lead_phone']);
+            $emailValid = empty($result['lead_email']) || $this->isValidEmail($result['lead_email']);
+            $hasValidContact = (!empty($result['lead_phone']) && $phoneValid)
+                || (!empty($result['lead_email']) && $emailValid);
+
+            if ($phoneValid && $emailValid && $hasValidContact) {
+                if (!empty($result['lead_phone'])) {
+                    $conversation->lead_phone = $result['lead_phone'];
+                }
+                if (!empty($result['lead_email'])) {
+                    $conversation->lead_email = $result['lead_email'];
+                }
+                $conversation->summary = $result['summary'];
+                $conversation->status = 'notified';
+            } else {
+                // LOG 8bis : Coordonnées invalides, on ne notifie pas l'hôtelier
+                Log::warning('[ChatController] Invalid lead contact info, notification skipped', [
+                    'conversation_id' => $conversation->id,
+                    'lead_phone' => $result['lead_phone'] ?? null,
+                    'lead_email' => $result['lead_email'] ?? null,
+                    'phone_valid' => $phoneValid,
+                    'email_valid' => $emailValid,
+                ]);
+            }
         }
+
         $conversation->save();
 
         $bookingLink = null;
@@ -196,5 +219,40 @@ class ChatController extends Controller
         $conversation->update(['status' => 'contacted']);
 
         return response()->json(['data' => ['id' => $conversation->id, 'status' => 'contacted']]);
+    }
+
+    /**
+     * Vérifie qu'un numéro de téléphone contient bien 10 chiffres.
+     * Accepte les formats locaux (0XXXXXXXXX) et internationaux (+212XXXXXXXXX / 212XXXXXXXXX),
+     * qui sont normalisés vers le format local à 10 chiffres avant validation.
+     */
+    private function isValidPhoneNumber(?string $phone): bool
+    {
+        if (!$phone) {
+            return false;
+        }
+
+        // Ne garder que les chiffres
+        $digits = preg_replace('/\D/', '', $phone);
+
+        // Normaliser l'indicatif international marocain (+212 / 212) vers le 0 local
+        if (str_starts_with($digits, '212')) {
+            $digits = '0' . substr($digits, 3);
+        }
+
+        // Doit faire exactement 10 chiffres et commencer par 0
+        return (bool) preg_match('/^0[0-9]{9}$/', $digits);
+    }
+
+    /**
+     * Vérifie qu'un email respecte un format standard.
+     */
+    private function isValidEmail(?string $email): bool
+    {
+        if (!$email) {
+            return false;
+        }
+
+        return filter_var(trim($email), FILTER_VALIDATE_EMAIL) !== false;
     }
 }
