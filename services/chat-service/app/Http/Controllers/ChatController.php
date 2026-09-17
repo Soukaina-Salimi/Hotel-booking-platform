@@ -121,6 +121,37 @@ class ChatController extends Controller
             'ready_to_notify' => !empty($result['ready_to_notify']),
         ]);
 
+        // ✅ Validation des coordonnées AVANT d'envoyer quoi que ce soit au client.
+        // Si le modèle annonce "ready_to_notify" avec un téléphone/email invalide,
+        // on intercepte et on remplace sa réponse par une demande de correction,
+        // au lieu de laisser passer une fausse confirmation de prise en charge.
+        $phoneProvided = !empty($result['lead_phone']);
+        $emailProvided = !empty($result['lead_email']);
+        $phoneValid = !$phoneProvided || $this->isValidPhoneNumber($result['lead_phone']);
+        $emailValid = !$emailProvided || $this->isValidEmail($result['lead_email']);
+        $hasValidContact = ($phoneProvided && $phoneValid) || ($emailProvided && $emailValid);
+
+        if (!empty($result['ready_to_notify']) && ($phoneProvided || $emailProvided) && !$hasValidContact) {
+            // LOG 8bis : Coordonnées invalides, on ne notifie pas l'hôtelier
+            Log::warning('[ChatController] Invalid lead contact info, asking for correction', [
+                'conversation_id' => $conversation->id ?? null,
+                'lead_phone' => $result['lead_phone'] ?? null,
+                'lead_email' => $result['lead_email'] ?? null,
+                'phone_valid' => $phoneValid,
+                'email_valid' => $emailValid,
+            ]);
+
+            $result['ready_to_notify'] = false;
+
+            if ($phoneProvided && !$phoneValid) {
+                $result['reply'] = "Le numéro que vous m'avez donné ne semble pas valide (il doit contenir 10 chiffres, par exemple 0612345678). Pouvez-vous me le redonner ?";
+                $result['lead_phone'] = null;
+            } elseif ($emailProvided && !$emailValid) {
+                $result['reply'] = "L'adresse email que vous m'avez donnée ne semble pas valide. Pouvez-vous me la redonner ?";
+                $result['lead_email'] = null;
+            }
+        }
+
         $history[] = ['role' => 'assistant', 'content' => $result['reply']];
 
         $conversation->messages = $history;
@@ -128,31 +159,15 @@ class ChatController extends Controller
             $conversation->lead_name = $result['lead_name'];
         }
 
-        if (!empty($result['ready_to_notify']) && (!empty($result['lead_phone']) || !empty($result['lead_email']))) {
-            $phoneValid = empty($result['lead_phone']) || $this->isValidPhoneNumber($result['lead_phone']);
-            $emailValid = empty($result['lead_email']) || $this->isValidEmail($result['lead_email']);
-            $hasValidContact = (!empty($result['lead_phone']) && $phoneValid)
-                || (!empty($result['lead_email']) && $emailValid);
-
-            if ($phoneValid && $emailValid && $hasValidContact) {
-                if (!empty($result['lead_phone'])) {
-                    $conversation->lead_phone = $result['lead_phone'];
-                }
-                if (!empty($result['lead_email'])) {
-                    $conversation->lead_email = $result['lead_email'];
-                }
-                $conversation->summary = $result['summary'];
-                $conversation->status = 'notified';
-            } else {
-                // LOG 8bis : Coordonnées invalides, on ne notifie pas l'hôtelier
-                Log::warning('[ChatController] Invalid lead contact info, notification skipped', [
-                    'conversation_id' => $conversation->id,
-                    'lead_phone' => $result['lead_phone'] ?? null,
-                    'lead_email' => $result['lead_email'] ?? null,
-                    'phone_valid' => $phoneValid,
-                    'email_valid' => $emailValid,
-                ]);
+        if (!empty($result['ready_to_notify']) && $hasValidContact) {
+            if (!empty($result['lead_phone'])) {
+                $conversation->lead_phone = $result['lead_phone'];
             }
+            if (!empty($result['lead_email'])) {
+                $conversation->lead_email = $result['lead_email'];
+            }
+            $conversation->summary = $result['summary'];
+            $conversation->status = 'notified';
         }
 
         $conversation->save();
