@@ -118,6 +118,7 @@ class ChatController extends Controller
             'reply_preview' => substr($result['reply'] ?? '', 0, 200),
             'has_lead_name' => !empty($result['lead_name']),
             'has_lead_phone' => !empty($result['lead_phone']),
+            'has_lead_email' => !empty($result['lead_email']),
             'ready_to_notify' => !empty($result['ready_to_notify']),
         ]);
 
@@ -255,8 +256,8 @@ class ChatController extends Controller
             $digits = '0' . substr($digits, 3);
         }
 
-        // Doit faire exactement 10 chiffres et commencer par 0
-        return (bool) preg_match('/^0[0-9]{9}$/', $digits);
+        // Numero mobile marocain valide : 06 ou 07 suivi de 8 chiffres (10 chiffres au total)
+        return (bool) preg_match('/^0[67][0-9]{8}$/', $digits);
     }
 
     /**
