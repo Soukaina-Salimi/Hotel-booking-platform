@@ -14,8 +14,11 @@ import {
   Settings,
   Users,
   Bell,
+  Link2, // ✅ NOUVEAU
+  Link2Off,
   ChevronRight,
   Plus,
+  Shield,
   Edit,
   Trash2,
   Eye,
@@ -258,7 +261,11 @@ export default function PartnerDashboardPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
-
+  const [googleStatus, setGoogleStatus] = useState<{
+    connected: boolean;
+    google_email: string | null;
+  } | null>(null);
+  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     const cachedUser = localStorage.getItem("auth_user");
@@ -309,6 +316,36 @@ export default function PartnerDashboardPage() {
       })
       .catch((err) => console.error(err));
   }, [hotelId]);
+
+  // ✅ Récupérer le statut Google Calendar de l'hôtel
+  useEffect(() => {
+    if (!hotelId) return;
+    fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/google/status?hotel_id=${hotelId}`,
+    )
+      .then((res) => res.json())
+      .then((json) => setGoogleStatus(json))
+      .catch((err) => console.error("Google status error:", err));
+  }, [hotelId]);
+
+  // ✅ Détecter le retour de Google OAuth (paramètre ?google=connected)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("google") === "connected") {
+      // Re-fetch le statut après la connexion
+      if (hotelId) {
+        fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/google/status?hotel_id=${hotelId}`,
+        )
+          .then((res) => res.json())
+          .then((json) => setGoogleStatus(json))
+          .catch(console.error);
+      }
+      // Nettoyer l'URL
+      window.history.replaceState({}, "", "/partner/dashboard");
+    }
+  }, [hotelId]);
+
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -401,6 +438,23 @@ export default function PartnerDashboardPage() {
     setShowConversationModal(false);
   }
 
+  async function connectGoogle() {
+    if (!hotelId || isConnectingGoogle) return;
+    setIsConnectingGoogle(true);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/google/connect?hotel_id=${hotelId}`,
+      );
+      const data = await res.json();
+      if (data.auth_url) {
+        // Rediriger vers Google
+        window.location.href = data.auth_url;
+      }
+    } catch (err) {
+      console.error("Erreur connexion Google:", err);
+      setIsConnectingGoogle(false);
+    }
+  }
   const filteredCallbacks = callbacks.filter((cb) => {
     if (callbackFilter === "all") return true;
     if (callbackFilter === "in_progress") return cb.status === "in_progress";
@@ -1532,6 +1586,164 @@ export default function PartnerDashboardPage() {
                 Ajouter
               </button>
             </div>
+          </div>
+
+          {/* ✅ NOUVELLE SECTION : Google Calendar */}
+          <div className="bg-[#FDFDFD] rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <CalendarIcon size={20} style={{ color: palette.primary }} />
+                <h3
+                  className="font-display text-lg"
+                  style={{ color: palette.dark }}
+                >
+                  Google Calendar
+                </h3>
+              </div>
+              {googleStatus?.connected && (
+                <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
+                  Connecté
+                </span>
+              )}
+            </div>
+
+            {googleStatus === null ? (
+              // État de chargement
+              <div
+                className="flex items-center gap-2 text-sm"
+                style={{ color: palette.gray }}
+              >
+                <Loader2 size={16} className="animate-spin" />
+                Vérification de la connexion...
+              </div>
+            ) : googleStatus.connected ? (
+              // Connecté
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-green-50 border border-green-200">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: "#22C55E20", color: "#22C55E" }}
+                  >
+                    <CheckCircle size={20} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="font-medium text-sm"
+                      style={{ color: palette.dark }}
+                    >
+                      Votre agenda est connecté
+                    </p>
+                    <p
+                      className="text-xs truncate"
+                      style={{ color: palette.gray }}
+                    >
+                      {googleStatus.google_email}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs" style={{ color: palette.gray }}>
+                  Moha propose automatiquement des créneaux libres de votre
+                  agenda lorsqu'un client laisse ses coordonnées.
+                </p>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={connectGoogle}
+                    disabled={isConnectingGoogle}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition hover:bg-[#DED9D0]/20 disabled:opacity-60"
+                    style={{ borderColor: palette.cream, color: palette.gray }}
+                  >
+                    {isConnectingGoogle ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Link2 size={16} />
+                    )}
+                    Reconnecter
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Non connecté
+              <div className="space-y-4">
+                <div
+                  className="flex items-start gap-3 p-3 rounded-xl"
+                  style={{ backgroundColor: palette.cream + "40" }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                    style={{
+                      backgroundColor: palette.primary + "20",
+                      color: palette.primary,
+                    }}
+                  >
+                    <Link2Off size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <p
+                      className="font-medium text-sm"
+                      style={{ color: palette.dark }}
+                    >
+                      Aucun agenda connecté
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: palette.gray }}>
+                      Connectez votre Google Calendar pour que Moha propose
+                      automatiquement des créneaux de rendez-vous à vos clients.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={connectGoogle}
+                  disabled={isConnectingGoogle}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-white text-sm font-semibold transition hover:opacity-90 disabled:opacity-60 shadow-md hover:shadow-lg"
+                  style={{ backgroundColor: "#4285F4" }}
+                >
+                  {isConnectingGoogle ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    // Icône Google officielle
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 18 18"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill="#FFF"
+                        d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
+                      />
+                      <path
+                        fill="#FFF"
+                        d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
+                      />
+                      <path
+                        fill="#FFF"
+                        d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
+                      />
+                      <path
+                        fill="#FFF"
+                        d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
+                      />
+                    </svg>
+                  )}
+                  {isConnectingGoogle
+                    ? "Connexion..."
+                    : "Connecter Google Calendar"}
+                </button>
+
+                <div
+                  className="flex items-start gap-2 text-xs"
+                  style={{ color: palette.gray }}
+                >
+                  <Shield size={14} className="shrink-0 mt-0.5" />
+                  <span>
+                    Vos données d'agenda restent confidentielles. Nous accédons
+                    uniquement à vos disponibilités pour créer les rendez-vous.
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <button
