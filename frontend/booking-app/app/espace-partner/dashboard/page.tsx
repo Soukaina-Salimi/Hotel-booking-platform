@@ -320,9 +320,7 @@ export default function PartnerDashboardPage() {
   // ✅ Récupérer le statut Google Calendar de l'hôtel
   useEffect(() => {
     if (!hotelId) return;
-    fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/google/status?hotel_id=${hotelId}`,
-    )
+    fetch(`/api/google/status?hotel_id=${hotelId}`)
       .then((res) => res.json())
       .then((json) => setGoogleStatus(json))
       .catch((err) => console.error("Google status error:", err));
@@ -334,9 +332,7 @@ export default function PartnerDashboardPage() {
     if (params.get("google") === "connected") {
       // Re-fetch le statut après la connexion
       if (hotelId) {
-        fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/google/status?hotel_id=${hotelId}`,
-        )
+        fetch(`/api/google/status?hotel_id=${hotelId}`)
           .then((res) => res.json())
           .then((json) => setGoogleStatus(json))
           .catch(console.error);
@@ -442,9 +438,7 @@ export default function PartnerDashboardPage() {
     if (!hotelId || isConnectingGoogle) return;
     setIsConnectingGoogle(true);
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/google/connect?hotel_id=${hotelId}`,
-      );
+      const res = await fetch(`/api/google/connect?hotel_id=${hotelId}`);
       const data = await res.json();
       if (data.auth_url) {
         // Rediriger vers Google
