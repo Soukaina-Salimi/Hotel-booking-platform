@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Conversation;
+use App\Models\GoogleCalendarConnection;
+use App\Services\GoogleCalendarService;
 use App\Services\GroqService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -10,7 +12,10 @@ use Illuminate\Support\Facades\Log;
 
 class ChatController extends Controller
 {
-    public function __construct(private GroqService $groq) {}
+    public function __construct(
+        private GroqService $groq,
+        private GoogleCalendarService $googleCalendar,
+    ) {}
 
     public function sendMessage(Request $request)
     {
@@ -45,7 +50,6 @@ class ChatController extends Controller
         if (!empty($data['hotel_id'])) {
             $hotelUrl = config('services.hotel_service.url') . "/api/hotels/{$data['hotel_id']}";
 
-            // LOG 2 : URL appelée pour le mode "hotel"
             Log::info('[ChatController] Calling hotel service', [
                 'url' => $hotelUrl,
                 'hotel_id' => $data['hotel_id'],
@@ -54,7 +58,6 @@ class ChatController extends Controller
             try {
                 $hotelResponse = Http::timeout(30)->get($hotelUrl);
 
-                // LOG 3 : Réponse du service hôtel
                 Log::info('[ChatController] Hotel service response', [
                     'status' => $hotelResponse->status(),
                     'successful' => $hotelResponse->successful(),
@@ -63,7 +66,6 @@ class ChatController extends Controller
 
                 $hotel = $hotelResponse->json('data') ?? [];
             } catch (\Throwable $e) {
-                // LOG 4 : Exception sur l'appel au service hôtel
                 Log::error('[ChatController] Hotel service call failed', [
                     'url' => $hotelUrl,
                     'error_message' => $e->getMessage(),
@@ -80,7 +82,6 @@ class ChatController extends Controller
             if ($isLoggedIn) {
                 $bookingUrl = config('services.booking_service.url') . '/api/bookings';
 
-                // LOG 5 : URL appelée pour le mode "platform"
                 Log::info('[ChatController] Calling booking service', [
                     'url' => $bookingUrl,
                     'user_id' => $data['user_id'],
@@ -91,7 +92,6 @@ class ChatController extends Controller
                         'user_id' => $data['user_id'],
                     ]);
 
-                    // LOG 6 : Réponse du service booking
                     Log::info('[ChatController] Booking service response', [
                         'status' => $bookingsResponse->status(),
                         'successful' => $bookingsResponse->successful(),
@@ -100,7 +100,6 @@ class ChatController extends Controller
 
                     $bookings = $bookingsResponse->successful() ? $bookingsResponse->json('data') : [];
                 } catch (\Throwable $e) {
-                    // LOG 7 : Exception sur l'appel au service booking
                     Log::error('[ChatController] Booking service call failed', [
                         'url' => $bookingUrl,
                         'error_message' => $e->getMessage(),
@@ -122,10 +121,7 @@ class ChatController extends Controller
             'ready_to_notify' => !empty($result['ready_to_notify']),
         ]);
 
-        // ✅ Validation des coordonnées AVANT d'envoyer quoi que ce soit au client.
-        // Si le modèle annonce "ready_to_notify" avec un téléphone/email invalide,
-        // on intercepte et on remplace sa réponse par une demande de correction,
-        // au lieu de laisser passer une fausse confirmation de prise en charge.
+        // Validation des coordonnées AVANT d'envoyer quoi que ce soit au client.
         $phoneProvided = !empty($result['lead_phone']);
         $emailProvided = !empty($result['lead_email']);
         $phoneValid = !$phoneProvided || $this->isValidPhoneNumber($result['lead_phone']);
@@ -133,7 +129,6 @@ class ChatController extends Controller
         $hasValidContact = ($phoneProvided && $phoneValid) || ($emailProvided && $emailValid);
 
         if (!empty($result['ready_to_notify']) && ($phoneProvided || $emailProvided) && !$hasValidContact) {
-            // LOG 8bis : Coordonnées invalides, on ne notifie pas l'hôtelier
             Log::warning('[ChatController] Invalid lead contact info, asking for correction', [
                 'conversation_id' => $conversation->id ?? null,
                 'lead_phone' => $result['lead_phone'] ?? null,
@@ -153,6 +148,10 @@ class ChatController extends Controller
             }
         }
 
+        // ✅ NOUVEAU : Variable pour transporter les slots dans la réponse JSON
+        $extraData = [];
+
+        // Sauvegarder le message assistant (provisoire, il sera peut-être remplacé)
         $history[] = ['role' => 'assistant', 'content' => $result['reply']];
 
         $conversation->messages = $history;
@@ -168,7 +167,63 @@ class ChatController extends Controller
                 $conversation->lead_email = $result['lead_email'];
             }
             $conversation->summary = $result['summary'];
-            $conversation->status = 'notified';
+
+            // ✅ NOUVEAU : Vérifier si l'hôtel a connecté Google Calendar
+            $connection = !empty($data['hotel_id'])
+                ? GoogleCalendarConnection::where('hotel_id', $data['hotel_id'])->first()
+                : null;
+
+            $slotsProposed = false;
+
+            if ($connection) {
+                try {
+                    Log::info('[ChatController] Google Calendar detected, fetching free slots', [
+                        'hotel_id' => $data['hotel_id'],
+                        'google_email' => $connection->google_email,
+                    ]);
+
+                    $slots = $this->googleCalendar->getFreeSlots($connection, 3);
+
+                    if (count($slots) > 0) {
+                        $conversation->status = 'slots_proposed';
+                        $conversation->proposed_slots = $slots;
+                        $conversation->slots_proposed_at = now();
+
+                        // Remplacer la réponse par les créneaux
+                        $slotsText = "Parfait ! Voici les créneaux disponibles pour un rendez-vous :";
+                        $result['reply'] = $slotsText;
+
+                        // Remplacer aussi le dernier message dans l'historique
+                        $history[count($history) - 1] = ['role' => 'assistant', 'content' => $slotsText];
+                        $conversation->messages = $history;
+
+                        $extraData['slots'] = $slots;
+                        $slotsProposed = true;
+
+                        Log::info('[ChatController] Slots proposed', [
+                            'conversation_id' => $conversation->id,
+                            'slots_count' => count($slots),
+                        ]);
+                    } else {
+                        // Aucun créneau dispo → fallback notification classique
+                        $conversation->status = 'notified';
+
+                        Log::info('[ChatController] No free slots found, falling back to notified');
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('[ChatController] Google Calendar error', [
+                        'hotel_id' => $data['hotel_id'],
+                        'error_message' => $e->getMessage(),
+                        'error_class' => get_class($e),
+                    ]);
+                    $conversation->status = 'notified';
+                }
+            } else {
+                // Pas de Google Calendar connecté → comportement habituel
+                $conversation->status = 'notified';
+
+                Log::info('[ChatController] No Google Calendar connection for this hotel');
+            }
         }
 
         $conversation->save();
@@ -187,17 +242,17 @@ class ChatController extends Controller
             ];
         }
 
-        // LOG 9 : Fin de la requête
         Log::info('[ChatController] sendMessage completed', [
             'conversation_id' => $conversation->id,
             'has_booking_link' => !empty($bookingLink),
+            'has_slots' => !empty($extraData['slots']),
         ]);
 
-        return response()->json([
+        return response()->json(array_merge([
             'conversation_id' => $conversation->id,
             'reply' => $result['reply'],
             'link' => $bookingLink ?? ($result['link'] ?? null),
-        ]);
+        ], $extraData));
     }
 
     public function todos(Request $request)
@@ -209,7 +264,7 @@ class ChatController extends Controller
         $todos = Conversation::query()
             ->where('hotel_id', $request->query('hotel_id'))
             ->orderByDesc('created_at')
-            ->get(['id', 'lead_name', 'lead_phone', 'summary', 'status', 'messages', 'created_at']);
+            ->get(['id', 'lead_name', 'lead_phone', 'lead_email', 'summary', 'status', 'messages', 'created_at']);
 
         return response()->json(['data' => $todos]);
     }
@@ -222,7 +277,7 @@ class ChatController extends Controller
             ->whereNull('hotel_id')
             ->where('status', 'notified')
             ->orderByDesc('created_at')
-            ->get(['id', 'lead_name', 'lead_phone', 'summary', 'messages', 'created_at']);
+            ->get(['id', 'lead_name', 'lead_phone', 'lead_email', 'summary', 'messages', 'created_at']);
 
         return response()->json(['data' => $todos]);
     }
@@ -239,8 +294,6 @@ class ChatController extends Controller
 
     /**
      * Vérifie qu'un numéro de téléphone contient bien 10 chiffres.
-     * Accepte les formats locaux (0XXXXXXXXX) et internationaux (+212XXXXXXXXX / 212XXXXXXXXX),
-     * qui sont normalisés vers le format local à 10 chiffres avant validation.
      */
     private function isValidPhoneNumber(?string $phone): bool
     {
@@ -248,15 +301,12 @@ class ChatController extends Controller
             return false;
         }
 
-        // Ne garder que les chiffres
         $digits = preg_replace('/\D/', '', $phone);
 
-        // Normaliser l'indicatif international marocain (+212 / 212) vers le 0 local
         if (str_starts_with($digits, '212')) {
             $digits = '0' . substr($digits, 3);
         }
 
-        // Numero mobile marocain valide : 06 ou 07 suivi de 8 chiffres (10 chiffres au total)
         return (bool) preg_match('/^0[67][0-9]{8}$/', $digits);
     }
 

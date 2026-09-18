@@ -3,7 +3,16 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Send, X, Minimize2, Maximize2, ChevronRight } from "lucide-react";
+import {
+  Send,
+  X,
+  Minimize2,
+  Maximize2,
+  ChevronRight,
+  Calendar as CalendarIcon,
+  Check,
+  Loader2,
+} from "lucide-react";
 
 const palette = {
   primary: "#7F9BA9",
@@ -17,19 +26,22 @@ const palette = {
   gray: "#595B57",
 };
 
+type Slot = {
+  start: string;
+  end: string;
+  label: string;
+};
+
 type ChatMessage = {
   id: number;
   role: "assistant" | "user";
   content: string;
   link?: { label: string; href: string } | null;
+  slots?: Slot[] | null; // ✅ AJOUT
+  conversationId?: string | null; // ✅ AJOUT
+  slotResolved?: boolean; // ✅ AJOUT — pour griser les boutons après clic
 };
 
-/**
- * Mascotte du chat : petit robot compact au buste blanc/creme, visiere sombre
- * et yeux en croissants lumineux (ton sable plutot que le cyan classique, pour
- * rester dans la palette Dariwane). Inspire d'un robot-jouet poli, pas d'un
- * robot generique gris metal.
- */
 function RobotFace({ size = 40 }: { size?: number }) {
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
@@ -46,7 +58,6 @@ function RobotFace({ size = 40 }: { size?: number }) {
             <stop offset="100%" stopColor={palette.cream} />
           </linearGradient>
         </defs>
-
         <rect
           x="20"
           y="78"
@@ -56,7 +67,6 @@ function RobotFace({ size = 40 }: { size?: number }) {
           fill={palette.cream}
         />
         <rect x="44" y="68" width="12" height="12" fill={palette.cream} />
-
         <circle
           cx="16"
           cy="52"
@@ -73,7 +83,6 @@ function RobotFace({ size = 40 }: { size?: number }) {
           stroke={palette.wood}
           strokeWidth="1.5"
         />
-
         <rect
           x="22"
           y="14"
@@ -84,7 +93,6 @@ function RobotFace({ size = 40 }: { size?: number }) {
           stroke={palette.wood}
           strokeWidth="1.5"
         />
-
         <rect
           x="32"
           y="34"
@@ -93,7 +101,6 @@ function RobotFace({ size = 40 }: { size?: number }) {
           rx="11"
           fill={palette.dark}
         />
-
         <g className="dariwane-eyes dariwane-glow">
           <path
             d="M40 47 Q44 41 48 47"
@@ -129,6 +136,7 @@ export default function ChatWidget({ hotelId }: { hotelId?: string }) {
   ]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isBooking, setIsBooking] = useState(false); // ✅ AJOUT
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -173,6 +181,8 @@ export default function ChatWidget({ hotelId }: { hotelId?: string }) {
         role: "assistant",
         content: json.reply,
         link: json.link ?? null,
+        slots: json.slots ?? null, // ✅ AJOUT
+        conversationId: json.conversation_id ?? null, // ✅ AJOUT
       });
     } catch (err) {
       pushMessage({
@@ -185,7 +195,58 @@ export default function ChatWidget({ hotelId }: { hotelId?: string }) {
     }
   }
 
-  // Le widget concierge n'a de sens que sur une page rattachée à un hôtel précis.
+  // ✅ NOUVEAU — Sélection d'un créneau
+  async function handleSlotSelect(messageId: number, slotIndex: number) {
+    if (isBooking) return;
+
+    const message = messages.find((m) => m.id === messageId);
+    const slot = message?.slots?.[slotIndex];
+    const convId = message?.conversationId || conversationId;
+
+    if (!slot || !convId) return;
+
+    setIsBooking(true);
+
+    try {
+      const res = await fetch(`/api/chat/select-slot`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversation_id: convId,
+          slot_index: slotIndex,
+        }),
+      });
+      const json = await res.json();
+
+      // Marque la carte de créneaux comme résolue (les boutons deviennent inactifs)
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId ? { ...m, slotResolved: true } : m,
+        ),
+      );
+
+      if (json.success) {
+        pushMessage({
+          role: "assistant",
+          content: `✅ Parfait ! Votre rendez-vous est confirmé pour le ${json.label}. Un conseiller vous appellera à ce moment-là. À très vite !`,
+        });
+      } else {
+        pushMessage({
+          role: "assistant",
+          content: `❌ ${json.error || "Impossible de réserver ce créneau. Réessayez ou choisissez-en un autre."}`,
+        });
+      }
+    } catch (err) {
+      console.error("select-slot error:", err);
+      pushMessage({
+        role: "assistant",
+        content: "❌ Erreur de connexion. Vérifiez votre réseau et réessayez.",
+      });
+    } finally {
+      setIsBooking(false);
+    }
+  }
+
   if (!hotelId) return null;
 
   if (!isOpen) {
@@ -279,6 +340,46 @@ export default function ChatWidget({ hotelId }: { hotelId?: string }) {
                     }
                   >
                     {m.content}
+
+                    {/* ✅ NOUVEAU — Boutons de créneaux cliquables */}
+                    {m.slots && m.slots.length > 0 && (
+                      <div className="mt-3 space-y-1.5">
+                        {m.slots.map((slot, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleSlotSelect(m.id, idx)}
+                            disabled={m.slotResolved || isBooking}
+                            className="w-full text-left px-3 py-2.5 rounded-xl border-2 transition flex items-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed hover:enabled:bg-[#7F9BA9]/10"
+                            style={{
+                              borderColor: palette.primary + "50",
+                              backgroundColor: palette.white,
+                              color: palette.dark,
+                            }}
+                          >
+                            {isBooking && !m.slotResolved ? (
+                              <Loader2
+                                size={15}
+                                className="animate-spin shrink-0"
+                                style={{ color: palette.primary }}
+                              />
+                            ) : (
+                              <CalendarIcon
+                                size={15}
+                                className="shrink-0"
+                                style={{ color: palette.primary }}
+                              />
+                            )}
+                            <span className="text-sm font-medium flex-1">
+                              {slot.label}
+                            </span>
+                            {m.slotResolved && (
+                              <Check size={14} style={{ color: "#22C55E" }} />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     {m.link && (
                       <Link
                         href={m.link.href}
