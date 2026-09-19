@@ -13,3 +13,4 @@ Route::get('/google/connect', [GoogleCalendarController::class, 'connect']);
 Route::get('/google/callback', [GoogleCalendarController::class, 'callback']);
 Route::get('/google/status', [GoogleCalendarController::class, 'status']);
 Route::post('/chat/select-slot', [GoogleCalendarController::class, 'selectSlot']);
+Route::get('/chat/appointments', [GoogleCalendarController::class, 'appointments']);

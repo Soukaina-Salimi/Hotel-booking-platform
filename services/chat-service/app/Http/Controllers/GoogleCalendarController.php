@@ -174,4 +174,72 @@ class GoogleCalendarController extends Controller
             'label' => $selectedSlot['label'],
         ]);
     }
+
+    /**
+     * GET /api/chat/appointments?hotel_id=xxx&month=2026-09
+     * Retourne les RDV (Moha + Google) pour le mois demandé.
+     */
+    public function appointments(Request $request)
+    {
+        $request->validate([
+            'hotel_id' => 'required|uuid',
+            'month'    => 'nullable|regex:/^\d{4}-\d{2}$/',
+        ]);
+
+        $month = $request->input('month', now()->format('Y-m'));
+        $start = \Carbon\Carbon::parse($month . '-01')->startOfMonth();
+        $end   = (clone $start)->endOfMonth();
+
+        $appointments = [];
+
+        // 1) RDV pris via Moha (DB locale)
+        $conversations = \App\Models\Conversation::where('hotel_id', $request->hotel_id)
+            ->whereNotNull('appointment_at')
+            ->whereBetween('appointment_at', [$start, $end])
+            ->orderBy('appointment_at')
+            ->get();
+
+        foreach ($conversations as $c) {
+            $appointments[] = [
+                'id'         => 'moha-' . $c->id,
+                'title'      => 'RDV ' . ($c->lead_name ?? 'Client'),
+                'start'      => $c->appointment_at->toIso8601String(),
+                'end'        => (clone $c->appointment_at)->addMinutes(30)->toIso8601String(),
+                'source'     => 'moha',
+                'lead_phone' => $c->lead_phone,
+                'lead_email' => $c->lead_email,
+                'summary'    => $c->summary,
+                'status'     => $c->status,
+            ];
+        }
+
+        // 2) Événements Google Calendar (optionnel mais recommandé)
+        $connection = \App\Models\GoogleCalendarConnection::where('hotel_id', $request->hotel_id)->first();
+        if ($connection) {
+            try {
+                $service = app(\App\Services\GoogleCalendarService::class);
+                $googleEvents = $service->listEvents($connection, $start, $end);
+                foreach ($googleEvents as $ev) {
+                    $appointments[] = [
+                        'id'     => 'google-' . $ev['id'],
+                        'title'  => $ev['title'],
+                        'start'  => $ev['start'],
+                        'end'    => $ev['end'],
+                        'source' => 'google',
+                        'status' => 'external',
+                    ];
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('[appointments] Google fetch failed: ' . $e->getMessage());
+            }
+        }
+
+        // Trie par date
+        usort($appointments, fn($a, $b) => strcmp($a['start'], $b['start']));
+
+        return response()->json([
+            'month'        => $month,
+            'appointments' => $appointments,
+        ]);
+    }
 }

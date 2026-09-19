@@ -186,4 +186,33 @@ class GoogleCalendarService
 
         return $created->getId();
     }
+
+    public function listEvents(GoogleCalendarConnection $connection, \DateTime $start, \DateTime $end): array
+    {
+        $client  = $this->buildClient($connection);
+        $service = new Calendar($client);
+
+        $events = $service->events->listEvents('primary', [
+            'timeMin'      => $start->format(\DateTime::RFC3339),
+            'timeMax'      => $end->format(\DateTime::RFC3339),
+            'singleEvents' => true,
+            'orderBy'      => 'startTime',
+            'maxResults'   => 100,
+        ]);
+
+        $out = [];
+        foreach ($events->getItems() as $ev) {
+            $startRaw = $ev->getStart()->getDateTime() ?? $ev->getStart()->getDate();
+            $endRaw   = $ev->getEnd()->getDateTime()   ?? $ev->getEnd()->getDate();
+            if (!$startRaw) continue;
+
+            $out[] = [
+                'id'    => $ev->getId(),
+                'title' => $ev->getSummary() ?? '(sans titre)',
+                'start' => (new \DateTime($startRaw))->format(\DateTime::RFC3339),
+                'end'   => (new \DateTime($endRaw))->format(\DateTime::RFC3339),
+            ];
+        }
+        return $out;
+    }
 }

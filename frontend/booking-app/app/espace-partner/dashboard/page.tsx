@@ -46,6 +46,7 @@ import {
 import { useRouter } from "next/navigation";
 
 const API_URL = "https://chat-service-production-eeb1.up.railway.app/api";
+import PartnerCalendar from "@/components/PartnerCalendar";
 
 const palette = {
   primary: "#7F9BA9",
@@ -1045,48 +1046,10 @@ export default function PartnerDashboardPage() {
   );
 
   // ============ CALENDAR ============
-  const renderCalendar = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="font-display text-2xl" style={{ color: palette.dark }}>
-          Disponibilités
-        </h2>
-        <div className="flex gap-2">
-          <button
-            className="px-4 py-2 rounded-xl text-sm font-medium border transition hover:bg-[#DED9D0]/20"
-            style={{ borderColor: palette.cream, color: palette.gray }}
-          >
-            <ChevronRight size={16} className="rotate-180 inline" />
-          </button>
-          <button
-            className="px-4 py-2 rounded-xl text-sm font-medium border transition hover:bg-[#DED9D0]/20"
-            style={{ borderColor: palette.cream, color: palette.gray }}
-          >
-            Mars 2024
-          </button>
-          <button
-            className="px-4 py-2 rounded-xl text-sm font-medium border transition hover:bg-[#DED9D0]/20"
-            style={{ borderColor: palette.cream, color: palette.gray }}
-          >
-            <ChevronRight size={16} className="inline" />
-          </button>
-        </div>
-      </div>
-      <div className="bg-[#FDFDFD] rounded-2xl p-5 shadow-sm overflow-x-auto">
-        <div className="text-center py-12" style={{ color: palette.gray }}>
-          <CalendarIcon
-            size={48}
-            className="mx-auto mb-3"
-            style={{ color: palette.cream }}
-          />
-          <p>Calendrier des disponibilités</p>
-          <p className="text-sm">
-            Gérez les disponibilités de vos chambres ici
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  const renderCalendar = () => {
+    if (!hotelId) return null;
+    return <PartnerCalendar hotelId={hotelId} apiUrl={API_URL} />;
+  };
 
   // ============ BOOKINGS ============
   const renderBookings = () => (
