@@ -77,7 +77,7 @@ const menuItems = [
     id: "dashboard",
   },
   { icon: <Bed size={18} />, label: "Chambres", id: "rooms" },
-  { icon: <CalendarIcon size={18} />, label: "Disponibilités", id: "calendar" },
+  { icon: <CalendarIcon size={18} />, label: "Agenda", id: "calendar" },
   { icon: <Users size={18} />, label: "Réservations", id: "bookings" },
   { icon: <Star size={18} />, label: "Avis", id: "reviews" },
   { icon: <BarChart3 size={18} />, label: "Statistiques", id: "stats" },

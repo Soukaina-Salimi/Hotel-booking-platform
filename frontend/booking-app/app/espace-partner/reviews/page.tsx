@@ -86,7 +86,7 @@ const menuItems = [
   },
   {
     icon: <CalendarIcon size={18} />,
-    label: "Disponibilités",
+    label: "Agenda",
     href: "/espace-partner/calendar",
   },
   {
